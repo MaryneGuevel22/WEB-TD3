@@ -1,12 +1,15 @@
 package galerie.dao;
 
 import galerie.entity.Exposition;
+import lombok.extern.log4j.Log4j2;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
-import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.logging.Logger;
 
 import org.springframework.test.context.jdbc.Sql;
 

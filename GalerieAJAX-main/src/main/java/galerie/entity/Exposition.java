@@ -6,7 +6,7 @@ import javax.persistence.*;
 import lombok.*;
 
 @Getter @Setter @NoArgsConstructor @RequiredArgsConstructor @ToString
-@Entity // Une entité JPA
+@Entity
 public class Exposition {
     @Id  @GeneratedValue(strategy = GenerationType.IDENTITY) 
     private Integer id;
@@ -31,13 +31,7 @@ public class Exposition {
     private List<Transaction> ventes = new LinkedList<>();
     
     public float CA() {
-        float result =0.0f;
-        for (Transaction vente : ventes)
-            result += vente.getPrixVente();
-        return result;
-        // Ca peut s'écrire en une seule ligne avec l'API Stream API.
-        // cf. https://www.baeldung.com/java-stream-sum
-        // return ventes.stream().map(vente -> vente.getPrixVente()).reduce(0f, Float::sum);
+     return ventes.stream().map(vente -> vente.getPrixVente()).reduce(0f, Float::sum);
     }
 
 	public Integer getId() {
