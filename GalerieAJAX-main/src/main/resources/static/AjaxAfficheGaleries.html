@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Les galeries</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <link rel="stylesheet" type="text/css" href="css/style.css"/>	
+
+        <!-- On charge la bibliothèque JQuery -->
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+        <!-- On charge le moteur de template mustache https://mustache.github.io/ -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mustache.js/0.8.1/mustache.min.js"></script>		
+
+	    <!-- Un petit script pour sérialiser un formulaire en JSON -->
+	    <!-- cf. https://github.com/macek/jquery-serialize-object -->
+	    <script src="./js/jquery.serialize-object.js"></script>
+
+        <script>
+            $(document).ready(// Exécuté à la fin du chargement de la page
+                    function () {
+            			//On charge puis on affiche les galeries
+                        chargeGaleries();
+                    }
+            );
+
+            // Fonction qui traite les résultats de la requête
+            function afficheTableGaleries(resultJson) {
+                // Le code source du template est dans la page
+                var template = $('#galeriesTemplate').html();
+                // On combine le template avec le résultat de la requête
+                var processedTemplate = Mustache.to_html(template, resultJson);
+                // On affiche le résultat dans la page
+                $('#tableGaleries').html(processedTemplate);
+            }
+
+            // Afficher un message d'erreur
+            function afficheMessage(error) {
+                $("#message").html(error);
+            }
+
+            // Un appel AJAX GET pour chercher la liste des galeries
+            function chargeGaleries() {
+            	//On réinitialise le message affiché par la précédente requête
+                afficheMessage("");
+                fetch("api/galeries")
+                    .then(response => response.json())
+                    .then(json => afficheTableGaleries(json))
+                    .catch(error => afficheMessage(error));
+            }
+            
+         	// Enregistrer une nouvelle galerie
+            function ajouteGalerie() {
+                // On fait un appel POST pour enregistrer une nouvelle galerie
+                // à partir des données saisies dans le formulaire
+                fetch("api/galeries",
+                    {
+                        method: 'post',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        // Transforme les données saisies dans le formulaire en format JSON
+                        body: $('#formulaire').serializeJSON()
+                    })
+                    .then(response => {
+                        // On vérifie le code de retour de la requête
+                        // https://developer.mozilla.org/fr/docs/Web/HTTP/Status
+                        // On s'attend à 201 si l'entrée a bien été créée dans la base de données
+                        // Et 409 si l'entrée existe déjà
+                        switch (response.status) {
+                            case 201: // Created donc on recharge la liste des galeries
+                                chargeGaleries();
+                                break;
+                            case 409: // Conflict: doublon dans les noms
+                                afficheMessage("Cette galerie existe déjà !");
+                                break;
+                        }
+                    })
+                    .catch(error => afficheMessage(error));
+            }
+         	
+         	// Supprimer une galerie
+         	function supprimeGalerie(id) {
+         		fetch("api/galeries/" + id,
+         			{
+	                    method: 'delete',
+	                    headers: {
+	                        'Accept': 'application/json',
+	                        'Content-Type': 'application/json'
+                    },
+                })
+                .then(response => {
+	                // On vérifie le code de retour de la requête
+	                // https://developer.mozilla.org/fr/docs/Web/HTTP/Status
+					// On s'attend à 204 si la ressource a bien été supprimée
+					// Et 404 si la ressource n'existe pas
+	                switch (response.status) {
+		                case 204: // Deleted donc on recharge la liste des galeries
+		                    chargeGaleries();
+		                    break;
+		                case 404: // Not found (ne devrait pas arriver si la table des galeries est bien rafraîchie après un delete)
+		                    afficheMessage("Cette galerie n'existe pas...");
+		                    break;
+		                case 409: // Conflict: la galerie a des contraintes avec des expositions, on ne peut pas la supprimer
+		                    afficheMessage("Impossible de supprimer cette galerie, il faut d'abord supprimer ses expositions");
+		                    break;
+	                }
+            	})
+                .catch(error => afficheMessage(error));
+
+         	}
+         	
+        </script>        
+    </head>
+    <body>
+	    <!-- Le formulaire de saisie -->
+	    <form id="formulaire">
+	        <label for="nom">Nom</label>
+	        <input name="nom" placeholder="Nom de la galerie"><br>
+	        <label for="adresse">Adresse</label>
+	        <input name="adresse" placeholder="Adresse de la galerie"></input><br>
+	        <button type="button" onclick="ajouteGalerie()">Ajouter</button>
+	    </form>
+	    
+	    <!-- Les messages d'erreur s'affichent ici -->
+	    <div id="message"></div>
+	    
+	    <!-- La table des galeries -->
+        <div id="tableGaleries"></div>
+        
+        <hr>
+        <a href="/">Retour au menu</a>
+
+        <!-- Le template Mustache qui sert à formatter la liste des galeries -->
+        <script id="galeriesTemplate" type="text/template">
+            <h2>Liste des galeries ({{content.length}} / {{page.totalElements}})</h2>
+            <TABLE>
+            {{! Un commentaire Mustache }}
+            <TR><TH>Id</TH><TH>Nom</TH><TH>Adresse</TH><TH>Action</TH></TR>
+            {{! Pour chaque galerie dans le tableau 'content' }}
+            {{#content}}
+            {{! Une ligne dans la table }}
+            <TR><TD>{{id}}</TD><TD>{{nom}}</TD><TD>{{adresse}}</TD><TD><button onclick="supprimeGalerie({{id}})">Supprimer</button></TD></TR>
+            {{/content}}
+            </TABLE>
+        </script>	
+    </body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Les tableaux</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <link rel="stylesheet" type="text/css" href="css/style.css"/>	
+
+        <!-- On charge la bibliothèque JQuery -->
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+        <!-- On charge le moteur de template mustache https://mustache.github.io/ -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mustache.js/0.8.1/mustache.min.js"></script>		
+
+	    <!-- Un petit script pour sérialiser un formulaire en JSON -->
+	    <!-- cf. https://github.com/macek/jquery-serialize-object -->
+	    <script src="./js/jquery.serialize-object.js"></script>
+
+        <script>
+            $(document).ready(// Exécuté à la fin du chargement de la page
+                    function () {
+            			//On charge puis on affiche les tableaux
+                        chargeTableaux();
+            			//On charge puis on affiche les artistes pour le select de l'ajout de tableaux
+            			chargeArtistes();
+                    }
+            );
+
+            // Fonction qui traite les résultats de la requête
+            function afficheTableTableaux(resultJson) {
+                // Le code source du template est dans la page
+                var template = $('#tableauxTemplate').html();
+                // On combine le template avec le résultat de la requête
+                var processedTemplate = Mustache.to_html(template, resultJson);
+                // On affiche le résultat dans la page
+                $('#tableTableaux').html(processedTemplate);
+            }
+            
+            // Fonction qui traite les résultats de la requête
+            function afficheSelectAuteurs(resultJson) {
+                // Le code source du template est dans la page
+                var template = $('#auteursTemplate').html();
+                // On combine le template avec le résultat de la requête
+                var processedTemplate = Mustache.to_html(template, resultJson);
+                // On affiche le résultat dans la page
+                $('#selectAuteurs').html(processedTemplate);
+            }
+
+            // Afficher un message d'erreur
+            function afficheMessage(error) {
+                $("#message").html(error);
+            }
+
+            // Un appel AJAX GET pour chercher la liste des tableaux
+            function chargeTableaux() {
+            	//On réinitialise le message affiché par la précédente requête
+                afficheMessage("");
+                fetch("api/tableaus")
+                    .then(response => response.json())
+                    .then(async (json) => {
+                    	// Pour chaque tableau, on va chercher le nom son auteur
+                    	// afin de l'afficher dans la table
+                    	for(let result of json.content) {
+                    		var artist = await getArtistOfPaint(result.id);
+                    		if(artist != undefined) result.auteur = artist.nom;
+                    		else result.auteur = "Auteur inconnu";
+                    	}
+                    	afficheTableTableaux(json);
+                    })
+                    .catch(error => afficheMessage(error));
+            }
+            
+            // Retourne l'auteur associé à l'ID du tableau passé en paramètre
+            function getArtistOfPaint(artistId) {
+            	return fetch("api/tableaus/" + artistId + "/auteur")
+                .then(response => {
+                	switch(response.status){
+                		case 200: //On a trouvé un artiste correspondant
+                			return response.json();
+                		case 404: //L'auteur est inconnu
+                			return undefined
+                	}
+                })
+                .then(json => (json))
+                .catch(error => afficheMessage(error));
+            }
+            
+            // Un appel AJAX GET pour chercher la liste des artistes
+            function chargeArtistes() {
+				fetch("api/artistes")
+                .then(response => response.json())
+                .then(json => afficheSelectAuteurs(json))
+                .catch(error => afficheMessage(error));
+            }
+            
+         	// Enregistrer une nouvelle tableau
+         	// ERREUR LORS DU POST A CAUSE DE ARTISTE : Failed to convert from type [java.net.URI] to type [galerie.entity.Artiste] 
+            function ajouteTableau() {
+                // On fait un appel POST pour enregistrer un nouveau tableau
+                // à partir des données saisies dans le formulaire
+                fetch("api/tableaus",
+                    {
+                        method: 'post',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        // Transforme les données saisies dans le formulaire en format JSON
+                        body: $('#formulaire').serializeJSON()
+                    })
+                    .then(response => {
+                        // On vérifie le code de retour de la requête
+                        // https://developer.mozilla.org/fr/docs/Web/HTTP/Status
+                        // On s'attend à 201 si l'entrée a bien été créée dans la base de données
+                        // Et 409 si l'entrée existe déjà
+                        switch (response.status) {
+                            case 201: // Created donc on recharge la liste des tableaux
+                                chargeTableaux();
+                                break;
+                            case 409: // Conflict: doublon dans les noms
+                                afficheMessage("Ce tableau existe déjà !");
+                                break;
+                        }
+                    })
+                    .catch(error => afficheMessage(error));
+            }
+         	
+         	// Supprimer une tableau
+         	function supprimeTableau(id) {
+         		fetch("api/tableaus/" + id,
+         			{
+	                    method: 'delete',
+	                    headers: {
+	                        'Accept': 'application/json',
+	                        'Content-Type': 'application/json'
+                    },
+                })
+                .then(response => {
+	                // On vérifie le code de retour de la requête
+	                // https://developer.mozilla.org/fr/docs/Web/HTTP/Status
+					// On s'attend à 204 si la ressource a bien été supprimée
+					// Et 404 si la ressource n'existe pas
+	                switch (response.status) {
+	                case 204: // Deleted donc on recharge la liste des tableaux
+	                    chargeTableaux();
+	                    break;
+	                case 404: // Not found (ne devrait pas arriver si la table des tableaux est bien rafraîchie après un delete)
+	                    afficheMessage("Ce tableau n'existe pas...");
+	                    break;
+	                case 409: // Conflict: le tableau a des contraintes avec des expositions ou des ventes, on ne peut pas la supprimer
+	                	afficheMessage("Impossible de supprimer ce tableau.")
+	                }
+            	})
+                .catch(error => afficheMessage(error));
+         	}
+         	
+        </script>        
+    </head>
+    <body>
+	    <!-- Le formulaire de saisie -->
+	    <form id="formulaire" >
+	        <label for="titre">Titre</label>
+	        <input name="titre" placeholder="Titre du tableau"><br>
+	        <label for="support">Support</label>
+	        <input name="support" placeholder="Support, ex: huile sur toile"></input><br>
+	        <label for="dimension">Dimension</label>
+	        <input name="dimension" placeholder="Dimensions, ex: 1m x 2m"></input><br>
+	        <label for="auteur">Auteur:</label>
+	        <div id="selectAuteurs"></div>     
+	        <button type="button" onclick="ajouteTableau()">Ajouter</button>
+	    </form>
+	    
+	    <!-- Les messages d'erreur s'affichent ici -->
+	    <div id="message"></div>
+	    
+	    <!-- La table des tableaux -->
+        <div id="tableTableaux"></div>
+        
+        <hr>        
+        <a href="/">Retour au menu</a>
+
+        <!-- Le template Mustache qui sert à formatter la liste des tableaux -->
+        <script id="tableauxTemplate" type="text/template">
+            <h2>Liste des tableaux ({{content.length}} / {{page.totalElements}})</h2>
+            <TABLE>
+            {{! Un commentaire Mustache }}
+            <TR><TH>Titre</TH><TH>Support</TH><TH>Dimension</TH><TH>Auteur</TH><TH>Action</TH></TR>
+            {{! Pour chaque tableau dans le tableau 'content' }}
+            {{#content}}
+            {{! Une ligne dans la table }}
+            <TR><TD>{{titre}}</TD><TD>{{support}}</TD><TD>{{dimension}}</TD><TD>{{auteur}}</TD><TD><button onclick="supprimeTableau({{id}})">Supprimer</button></TD></TR>
+            {{/content}}
+            </TABLE>
+        </script>	
+        
+        <script id="auteursTemplate" type="text/template">
+			<SELECT name="auteur">
+            	<OPTION value="0">Auteur inconnu</OPTION>
+            	{{#content}}
+            	<OPTION VALUE={{id}}>{{nom}}</option>
+           		{{/content}}
+            </SELECT>
+		</script>
+    </body>
+</html>
