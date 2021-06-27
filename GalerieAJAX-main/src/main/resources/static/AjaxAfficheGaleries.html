@@ -37,7 +37,7 @@
 			        "<th> Adresse </th>" +
 			        "<th> Action </th>" +
 			        "</tr>";
-			      for (let galerie of dataJSON) {
+			      for (let galerie of dataJSON.content) {
 			        char =
 			          char +
 			          "<tr>" +
@@ -64,9 +64,7 @@
 			}
 		  	
             
-            function postAddGalerie(event) {
-            
-            	event.preventDefault();
+            function postAddGalerie() {
             	
 				const url =
 			    "api/galeries";
@@ -139,7 +137,7 @@
 	        <input name="nom" placeholder="Nom de la galerie"><br>
 	        <label for="adresse">Adresse</label>
 	        <input name="adresse" placeholder="Adresse de la galerie"></input><br>
-	        <button type="button" onclick="ajouteGalerie()">Ajouter</button>
+	        <button type="button" onclick="postAddGalerie()">Ajouter</button>
 	    </form>
 	    
 	    <!-- La table des galeries -->
